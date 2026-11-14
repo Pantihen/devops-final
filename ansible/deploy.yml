@@ -1,0 +1,180 @@
+---
+- name: Deploy DevOps Final stack (app + Prometheus + Grafana)
+  hosts: localhost
+  connection: local
+  become: true
+  gather_facts: true
+
+  vars:
+    app_dir: /opt/devops-final
+    project_src: "{{ playbook_dir }}/.."
+    docker_packages:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    deb_arch_map:
+      x86_64: amd64
+      aarch64: arm64
+
+  tasks:
+    # ---------------------------------------------------------------- Docker
+    - name: Check whether Docker is installed
+      ansible.builtin.command: docker --version
+      register: docker_check
+      changed_when: false
+      failed_when: false
+
+    - name: Install Docker Engine (Debian/Ubuntu)
+      when:
+        - docker_check.rc != 0
+        - ansible_facts['os_family'] == 'Debian'
+      block:
+        - name: Install apt prerequisites
+          ansible.builtin.apt:
+            name: [ca-certificates, curl]
+            state: present
+            update_cache: true
+            cache_valid_time: 3600
+
+        - name: Create apt keyrings directory
+          ansible.builtin.file:
+            path: /etc/apt/keyrings
+            state: directory
+            mode: "0755"
+
+        - name: Add Docker's official GPG key
+          ansible.builtin.get_url:
+            url: "https://download.docker.com/linux/{{ ansible_facts['distribution'] | lower }}/gpg"
+            dest: /etc/apt/keyrings/docker.asc
+            mode: "0644"
+
+        - name: Add Docker apt repository
+          ansible.builtin.apt_repository:
+            repo: >-
+              deb [arch={{ deb_arch_map[ansible_facts['architecture']] | default('amd64') }}
+              signed-by=/etc/apt/keyrings/docker.asc]
+              https://download.docker.com/linux/{{ ansible_facts['distribution'] | lower }}
+              {{ ansible_facts['distribution_release'] }} stable
+            filename: docker
+            state: present
+
+        - name: Install Docker Engine and Compose plugin
+          ansible.builtin.apt:
+            name: "{{ docker_packages }}"
+            state: present
+            update_cache: true
+
+    - name: Fail if Docker is missing on an unsupported OS
+      ansible.builtin.fail:
+        msg: "Docker is not installed and automatic install is only implemented for Debian/Ubuntu."
+      when:
+        - docker_check.rc != 0
+        - ansible_facts['os_family'] != 'Debian'
+
+    - name: Ensure Docker service is started and enabled
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+      when: ansible_facts['os_family'] == 'Debian'
+
+    - name: Wait for Docker daemon to accept connections
+      ansible.builtin.command: docker info --format "{{ '{{' }}.ServerVersion{{ '}}' }}"
+      register: docker_info
+      changed_when: false
+      retries: 10
+      delay: 2
+      until: docker_info.rc == 0
+
+    # ------------------------------------------------------- Project files
+    - name: Create application directory
+      ansible.builtin.file:
+        path: "{{ app_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Copy docker-compose.yml and prometheus.yml
+      ansible.builtin.copy:
+        src: "{{ project_src }}/{{ item }}"
+        dest: "{{ app_dir }}/{{ item }}"
+        mode: "0644"
+      loop:
+        - docker-compose.yml
+        - prometheus.yml
+      register: compose_files
+
+    - name: Copy Grafana provisioning (datasource + dashboard)
+      ansible.builtin.copy:
+        src: "{{ project_src }}/grafana/"
+        dest: "{{ app_dir }}/grafana/"
+        directory_mode: "0755"
+        mode: "0644"
+      register: grafana_files
+
+    # ------------------------------------------------------------- Deploy
+    - name: Start the stack with docker compose up -d
+      ansible.builtin.command: docker compose up -d
+      args:
+        chdir: "{{ app_dir }}"
+      register: compose_up
+      # compose prints progress to stderr; only report "changed" when
+      # something was actually pulled, created, recreated or started.
+      changed_when: compose_up.stderr is search('(Pulled|Created|Recreated|Started)')
+
+    - name: Restart Prometheus if its config changed on a running stack
+      ansible.builtin.command: docker compose restart prometheus
+      args:
+        chdir: "{{ app_dir }}"
+      when:
+        - compose_files.results[1] is changed
+        - compose_up is not changed
+      changed_when: true
+
+    - name: Restart Grafana if its provisioning changed on a running stack
+      ansible.builtin.command: docker compose restart grafana
+      args:
+        chdir: "{{ app_dir }}"
+      when:
+        - grafana_files is changed
+        - compose_up is not changed
+      changed_when: true
+
+    # -------------------------------------------------------------- Verify
+    - name: Wait for the app health endpoint
+      ansible.builtin.uri:
+        url: http://localhost:3000/health
+        return_content: true
+      register: app_health
+      retries: 20
+      delay: 3
+      until: app_health.status == 200 and app_health.json.status == 'ok'
+
+    - name: Wait until Prometheus reports the app target as UP
+      ansible.builtin.uri:
+        url: http://localhost:9090/api/v1/targets?state=active
+        return_content: true
+      register: prom_targets
+      retries: 20
+      delay: 3
+      until: >-
+        prom_targets.status == 200 and
+        (prom_targets.json.data.activeTargets
+          | selectattr('labels.job', 'equalto', 'app')
+          | map(attribute='health') | list) == ['up']
+
+    - name: Wait for Grafana to become healthy
+      ansible.builtin.uri:
+        url: http://localhost:3001/api/health
+      register: grafana_health
+      retries: 20
+      delay: 3
+      until: grafana_health.status == 200
+
+    - name: Show deployment summary
+      ansible.builtin.debug:
+        msg:
+          - "App:        http://localhost:3000  (health: {{ app_health.json.status }})"
+          - "Prometheus: http://localhost:9090  (target app: up)"
+          - "Grafana:    http://localhost:3001"

@@ -1,0 +1,17 @@
+node_modules
+npm-debug.log
+coverage
+tests
+.git
+.gitignore
+.github
+.dockerignore
+Dockerfile
+docker-compose.yml
+prometheus.yml
+grafana
+ansible
+screenshots
+eslint.config.js
+*.md
+.env
