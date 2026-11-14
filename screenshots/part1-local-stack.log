@@ -1,0 +1,31 @@
+$ docker compose ps --format "table {{.Name}}	{{.Image}}	{{.Status}}	{{.Ports}}"
+NAME                      IMAGE                                  STATUS                   PORTS
+devops-final-app          ghcr.io/pantihen/devops-final:latest   Up 8 minutes (healthy)   0.0.0.0:3000->3000/tcp, [::]:3000->3000/tcp
+devops-final-grafana      grafana/grafana:12.1.1                 Up 8 minutes             0.0.0.0:3001->3000/tcp, [::]:3001->3000/tcp
+devops-final-prometheus   prom/prometheus:v3.5.0                 Up 8 minutes             0.0.0.0:9090->9090/tcp, [::]:9090->9090/tcp
+
+$ curl -s localhost:3000/
+DevOps Final Project
+$ curl -s localhost:3000/health
+{"status":"ok"}
+$ curl -s localhost:3000/metrics | grep -E '^(# HELP http_requests_total|# TYPE http_requests_total|http_requests_total|process_cpu_user_seconds_total|process_resident_memory_bytes|nodejs_heap_size_total_bytes|nodejs_eventloop_lag_seconds )'
+process_cpu_user_seconds_total{app="devops-final"} 3.411849999999998
+process_resident_memory_bytes{app="devops-final"} 64901120
+nodejs_heap_size_total_bytes{app="devops-final"} 15511552
+# HELP http_requests_total Total number of HTTP requests
+# TYPE http_requests_total counter
+http_requests_total{method="GET",route="/health",status_code="200",app="devops-final"} 292
+http_requests_total{method="GET",route="/metrics",status_code="200",app="devops-final"} 104
+http_requests_total{method="GET",route="/",status_code="200",app="devops-final"} 257
+http_requests_total{method="GET",route="unmatched",status_code="404",app="devops-final"} 35
+
+$ curl -s localhost:9090/api/v1/targets | jq -r '.data.activeTargets[] | "job=\(.labels.job)  url=\(.scrapeUrl)  health=\(.health)"'
+job=app  url=http://app:3000/metrics  health=up
+job=prometheus  url=http://localhost:9090/metrics  health=up
+
+$ curl -s -u admin:admin localhost:3001/api/datasources | jq -r '.[] | "\(.name)  type=\(.type)  url=\(.url)  default=\(.isDefault)"'
+Prometheus  type=prometheus  url=http://prometheus:9090  default=true
+
+$ curl -s -u admin:admin localhost:3001/api/datasources/uid/prometheus/health | jq -r .message
+Successfully queried the Prometheus API.
+
