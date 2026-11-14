@@ -1,0 +1,88 @@
+$ gh api repos/Pantihen/devops-final/branches/main/protection | jq "{required_status_checks: {strict: .required_status_checks.strict, contexts: .required_status_checks.contexts}, required_pull_request_reviews: {required_approving_review_count: .required_pull_request_reviews.required_approving_review_count}, enforce_admins: .enforce_admins.enabled}"
+{
+  "required_status_checks": {
+    "strict": true,
+    "contexts": [
+      "lint",
+      "test"
+    ]
+  },
+  "required_pull_request_reviews": {
+    "required_approving_review_count": 0
+  },
+  "enforce_admins": false
+}
+
+$ gh pr view 1 --json number,title,state,baseRefName,headRefName,mergedAt | jq .
+{
+  "baseRefName": "main",
+  "headRefName": "develop",
+  "mergedAt": "2026-11-14T11:09:38Z",
+  "number": 1,
+  "state": "MERGED",
+  "title": "release: DevOps final project"
+}
+
+$ gh pr checks 1
+build-and-push	skipping	0	https://github.com/Pantihen/devops-final/actions/runs/43588584622/job/132428494199	
+build-and-push	skipping	0	https://github.com/Pantihen/devops-final/actions/runs/43588593522/job/132428510492	
+lint	pass	14s	https://github.com/Pantihen/devops-final/actions/runs/43588584622/job/132428275022	
+lint	pass	15s	https://github.com/Pantihen/devops-final/actions/runs/43588593522/job/132428301746	
+test	pass	34s	https://github.com/Pantihen/devops-final/actions/runs/43588584622/job/132428345800	
+test	pass	31s	https://github.com/Pantihen/devops-final/actions/runs/43588593522/job/132428375635	
+
+$ gh run view 43588690897
+
+✓ main CI/CD · 43588690897
+Triggered via push about 5 minutes ago
+
+JOBS
+✓ lint in 16s (ID 132428595090)
+✓ test in 34s (ID 132428665324)
+✓ build-and-push in 1m6s (ID 132428819396)
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+lint: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+lint: .github#1
+
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+test: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+test: .github#1
+
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, docker/build-push-action@v6, docker/login-action@v3, docker/setup-buildx-action@v3, docker/setup-qemu-action@v3. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+build-and-push: .github#2
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+build-and-push: .github#1
+
+
+ARTIFACTS
+Pantihen~devops-final~QQTSKB.dockerbuild
+
+For more information about a job, try: gh run view --job=<job-id>
+View this run on GitHub: https://github.com/Pantihen/devops-final/actions/runs/43588690897
+
+$ docker buildx imagetools inspect ghcr.io/pantihen/devops-final:latest | head -12
+Name:      ghcr.io/pantihen/devops-final:latest
+MediaType: application/vnd.oci.image.index.v1+json
+Digest:    sha256:6601c3302b1521a6ba4106e1fbf51e9c3fc4644400c862f0c4fd41dfc4bb15b1
+           
+Manifests: 
+  Name:        ghcr.io/pantihen/devops-final:latest@sha256:d9af95d16a5c35592ddae07b25d152e72757ffee36e3fed1a05673f357983315
+  MediaType:   application/vnd.oci.image.manifest.v1+json
+  Platform:    linux/amd64
+               
+  Name:        ghcr.io/pantihen/devops-final:latest@sha256:8997298bbc3458eb6a75593cfb0ee253c1e35926b836aefe806aae448c5095c3
+  MediaType:   application/vnd.oci.image.manifest.v1+json
+  Platform:    linux/arm64
+
+$ docker buildx imagetools inspect ghcr.io/pantihen/devops-final:a3141c47be3fc226bf963184bbd0d628fec88e65 | head -3
+Name:      ghcr.io/pantihen/devops-final:a3141c47be3fc226bf963184bbd0d628fec88e65
+MediaType: application/vnd.oci.image.index.v1+json
+Digest:    sha256:6601c3302b1521a6ba4106e1fbf51e9c3fc4644400c862f0c4fd41dfc4bb15b1
+

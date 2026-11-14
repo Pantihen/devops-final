@@ -1,0 +1,71 @@
+
+PLAY [Deploy DevOps Final stack (app + Prometheus + Grafana)] ******************
+
+TASK [Gathering Facts] *********************************************************
+ok: [localhost]
+
+TASK [Check whether Docker is installed] ***************************************
+ok: [localhost]
+
+TASK [Install apt prerequisites] ***********************************************
+skipping: [localhost]
+
+TASK [Create apt keyrings directory] *******************************************
+skipping: [localhost]
+
+TASK [Add Docker's official GPG key] *******************************************
+skipping: [localhost]
+
+TASK [Add Docker apt repository] ***********************************************
+skipping: [localhost]
+
+TASK [Install Docker Engine and Compose plugin] ********************************
+skipping: [localhost]
+
+TASK [Fail if Docker is missing on an unsupported OS] **************************
+skipping: [localhost]
+
+TASK [Ensure Docker service is started and enabled] ****************************
+ok: [localhost]
+
+TASK [Wait for Docker daemon to accept connections] ****************************
+ok: [localhost]
+
+TASK [Create application directory] ********************************************
+ok: [localhost]
+
+TASK [Copy docker-compose.yml and prometheus.yml] ******************************
+ok: [localhost] => (item=docker-compose.yml)
+ok: [localhost] => (item=prometheus.yml)
+
+TASK [Copy Grafana provisioning (datasource + dashboard)] **********************
+ok: [localhost]
+
+TASK [Start the stack with docker compose up -d] *******************************
+ok: [localhost]
+
+TASK [Restart Prometheus if its config changed on a running stack] *************
+skipping: [localhost]
+
+TASK [Restart Grafana if its provisioning changed on a running stack] **********
+skipping: [localhost]
+
+TASK [Wait for the app health endpoint] ****************************************
+ok: [localhost]
+
+TASK [Wait until Prometheus reports the app target as UP] **********************
+ok: [localhost]
+
+TASK [Wait for Grafana to become healthy] **************************************
+ok: [localhost]
+
+TASK [Show deployment summary] *************************************************
+ok: [localhost] => 
+    msg:
+    - 'App:        http://localhost:3000  (health: ok)'
+    - 'Prometheus: http://localhost:9090  (target app: up)'
+    - 'Grafana:    http://localhost:3001'
+
+PLAY RECAP *********************************************************************
+localhost                  : ok=12   changed=0    unreachable=0    failed=0    skipped=8    rescued=0    ignored=0   
+
